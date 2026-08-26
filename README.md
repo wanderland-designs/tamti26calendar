@@ -26,7 +26,6 @@ anything.
    - Repo → Settings → Secrets and variables → Actions → New repository secret
    - Name: `KRONOX_URL`
    - Value: your link, e.g.
-     `https://schema.hb.se/setup/jsp/SchemaICAL.ics?startDatum=today&intervallTyp=a&intervallAntal=1&sokMedAND=false&sprak=EN&resurser=p.TAMTI26h%2C`
 
 4. **Enable GitHub Pages:**
    - Repo → Settings → Pages
