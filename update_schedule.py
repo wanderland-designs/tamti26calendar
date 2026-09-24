@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
 """
-Fetches the live Kronox iCal feed, shortens/translates course names into
-the event title (SUMMARY), and writes a cleaned .ics to docs/schema_clean.ics
-for publishing (e.g. via GitHub Pages).
+Fetches one or more live Kronox iCal feeds, shortens/translates course names
+into the event title (SUMMARY), and writes a cleaned .ics per course to
+docs/ for publishing (e.g. via GitHub Pages).
 
-The KRONOX_URL is read from an environment variable so it never has to be
-committed to the repo.
+Each course's Kronox URL is read from its own environment variable so none
+of them have to be committed to the repo.
 """
-
 import os
 import re
 import sys
 import urllib.request
 
-KRONOX_URL = os.environ.get("KRONOX_URL")
-OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "docs", "schema_clean.ics")
+DOCS_DIR = os.path.join(os.path.dirname(__file__), "docs")
+
+# --- Courses to sync ----------------------------------------------------
+# Add one entry per schedule you want published. "env" is the name of the
+# repo secret holding that Kronox URL. "output" is the filename written
+# under docs/ — keep the first one as "schema_clean.ics" so your existing
+# subscribed calendar link keeps working unchanged.
+COURSES = [
+    {"name": "main", "env": "KRONOX_URL", "output": "schema_clean.ics"},
+    # {"name": "course2", "env": "KRONOX_URL_2", "output": "schema_clean_2.ics"},
+    # {"name": "course3", "env": "KRONOX_URL_3", "output": "schema_clean_3.ics"},
+]
 
 # --- Known course-name translations/shortenings -----------------------
 # Add to this as new courses show up in your schedule. Anything not listed
@@ -47,35 +56,26 @@ def shorten_course(kg: str):
     kg = kg.strip()
     if not kg:
         return None
-
-    # Course with credit-hp pattern: "Name, X.X hp ..."
     m = re.match(r"^(.*?),\s*\d+(?:\.\d+)?\s*hp", kg)
     if m:
         name = m.group(1).strip()
         if len(name) > 35 and "," in name:
             name = name.split(",")[0].strip()
         return COURSE_TRANSLATIONS.get(name, name)
-
     if kg.startswith("Akademin för textil, teknik och ekonomi"):
         return "Textile Academy (Other)" if "Övrigt" in kg else "Textile Academy"
-
     if kg in COURSE_TRANSLATIONS:
         return COURSE_TRANSLATIONS[kg]
-
-    # Fallback: first chunk before an obvious repeat/cutoff
-    return kg.split("  ")[0][:60].strip()
+    return kg.split(" ")[0][:60].strip()
 
 
 def process_summary(summary: str) -> str:
     kg_match = re.search(r"Kurs\.grp:\s*(.*?)\s*(?:Sign:|Moment:)", summary)
     kg_raw = kg_match.group(1) if kg_match else ""
-
     mo_match = re.search(r"Moment:\s*(.*?)\s*Aktivitetstyp:", summary)
     moment = mo_match.group(1).strip() if mo_match else None
     if moment is None:
-        # Unexpected format — leave untouched rather than mangling it
         return summary
-
     moment = MOMENT_TRANSLATIONS.get(moment, moment)
     short_course = shorten_course(kg_raw)
     return f"{short_course}: {moment}" if short_course else moment
@@ -88,38 +88,56 @@ def replace_summary_line(m: re.Match) -> str:
 def fetch_ics(url: str) -> str:
     req = urllib.request.Request(
         url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; personal-schedule-sync/1.0)"
-        },
+        headers={"User-Agent": "Mozilla/5.0 (compatible; personal-schedule-sync/1.0)"},
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         raw = resp.read()
-    # Kronox exports as UTF-8; fall back to latin-1 just in case
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
         return raw.decode("latin-1")
 
 
-def main():
-    if not KRONOX_URL:
-        print("ERROR: KRONOX_URL environment variable is not set.", file=sys.stderr)
-        sys.exit(1)
+def sync_course(course: dict) -> bool:
+    url = os.environ.get(course["env"])
+    if not url:
+        print(f"Skipping '{course['name']}': {course['env']} is not set.")
+        return False
 
-    content = fetch_ics(KRONOX_URL)
-
+    content = fetch_ics(url)
     new_content, n = re.subn(
         r"SUMMARY:(.*?)(?=\r\n[A-Z])", replace_summary_line, content, flags=re.S
     )
-
     for old, new in LITERAL_REPLACEMENTS.items():
         new_content = new_content.replace(old, new)
 
-    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
-    with open(OUTPUT_PATH, "w", encoding="utf-8", newline="") as f:
+    output_path = os.path.join(DOCS_DIR, course["output"])
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8", newline="") as f:
         f.write(new_content)
 
-    print(f"Updated {n} events -> {OUTPUT_PATH}")
+    print(f"[{course['name']}] Updated {n} events -> {output_path}")
+    return True
+
+
+def main():
+    any_synced = False
+    had_error = False
+
+    for course in COURSES:
+        try:
+            if sync_course(course):
+                any_synced = True
+        except Exception as e:
+            had_error = True
+            print(f"ERROR syncing '{course['name']}': {e}", file=sys.stderr)
+
+    if not any_synced:
+        print("ERROR: no course URLs were configured/found.", file=sys.stderr)
+        sys.exit(1)
+
+    if had_error:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
