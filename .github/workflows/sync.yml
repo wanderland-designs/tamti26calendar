@@ -19,6 +19,7 @@ jobs:
       - name: Run sync
         env:
           KRONOX_URL: ${{ secrets.KRONOX_URL }}
+          SWEDISH: ${{ secrets.SWEDISH }}
           KRONOX_URL_2: ${{ secrets.KRONOX_URL_2 }}
           KRONOX_URL_3: ${{ secrets.KRONOX_URL_3 }}
         run: python update_schedule.py
