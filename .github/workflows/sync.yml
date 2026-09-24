@@ -6,6 +6,9 @@ on:
     - cron: "0 5 * * *"    # ~05:00 UTC
     - cron: "0 17 * * *"   # ~17:00 UTC
 
+permissions:
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -20,14 +23,13 @@ jobs:
         env:
           KRONOX_URL: ${{ secrets.KRONOX_URL }}
           SWEDISH: ${{ secrets.SWEDISH }}
-          KRONOX_URL_2: ${{ secrets.MANAGEMENT_2Y }}
-          KRONOX_URL_3: ${{ secrets.KRONOX_URL_3 }}
+          MANAGEMENT_2Y: ${{ secrets.MANAGEMENT_2Y }}
         run: python update_schedule.py
 
       - name: Commit updated feeds
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/*.ics
+          git add docs/*.ics state/known_courses.json
           git diff --cached --quiet || git commit -m "Update schedule feeds"
           git push
