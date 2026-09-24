@@ -57,3 +57,9 @@ that file on its own refresh schedule. No more manual re-importing.
 - **New/unrecognized course names**: they'll still show up, just untranslated
   and only lightly shortened. Add them to `COURSE_TRANSLATIONS` in
   `update_schedule.py` to translate/shorten them like the others.
+
+## To add a new course
+Repo → Settings → Secrets and variables → Actions → add e.g. KRONOX_URL_2 with that course's Kronox link.
+In update_schedule.py, uncomment/add a line in COURSES for it.
+In sync.yml, add the matching KRONOX_URL_2: ${{ secrets.KRONOX_URL_2 }} line.
+Run the workflow manually once, then subscribe to the new https://<user>.github.io/<repo>/schema_clean_2.ics URL in your calendar app.
