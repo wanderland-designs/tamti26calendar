@@ -3,12 +3,15 @@
     "known_courses": [
       "Advanced fibre and yarn technology",
       "Creative design processes",
+      "Ethics in the textile value chain",
       "Operations Support",
       "Textile Academy",
       "Textile Academy (Other)",
       "Textile Product Development",
       "Textile product design, construction and joining"
     ],
-    "new_course_alerts": {}
+    "new_course_alerts": {
+      "Ethics in the textile value chain": "2026-10-15"
+    }
   }
 }
